@@ -1,7 +1,9 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { IdentifiedContact, ParsedConversation } from "@/types";
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+import {
+  getGeminiJsonModel,
+  isSafetyBlockedResponse,
+} from "@/lib/gemini/model";
+import { z } from "zod";
 
 const EXTRACTION_PROMPT = `Você é um especialista em identificar informações pessoais em conversas de WhatsApp.
 
@@ -24,10 +26,19 @@ CONVERSA:
 {messages}
 `;
 
+const extractedContactSchema = z.object({
+  phone: z.string().nullable().default(null),
+  name: z.string().nullable().default(null),
+  cpf: z.string().nullable().default(null),
+  confidence: z.coerce.number().min(0).max(1).default(0.5),
+});
+
 export async function extractContactInfo(
   conversation: ParsedConversation
 ): Promise<IdentifiedContact> {
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  const model = getGeminiJsonModel(
+    "Extraia informações de contato com precisão e retorne apenas JSON válido."
+  );
 
   const messagesText = conversation.messages
     .slice(0, 50)
@@ -39,18 +50,23 @@ export async function extractContactInfo(
   try {
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    const text = response.text();
-
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
+    if (isSafetyBlockedResponse(response)) {
       return {
-        phone: parsed.phone,
-        name: parsed.name,
-        cpf: parsed.cpf,
-        confidence: parsed.confidence || 0.5,
+        phone: null,
+        name: null,
+        cpf: null,
+        confidence: 0,
       };
     }
+
+    const text = response.text();
+    const parsed = extractedContactSchema.parse(JSON.parse(text));
+    return {
+      phone: parsed.phone,
+      name: parsed.name,
+      cpf: parsed.cpf,
+      confidence: parsed.confidence,
+    };
   } catch (error) {
     console.error("Gemini extraction error:", error);
   }

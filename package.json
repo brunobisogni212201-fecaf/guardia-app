@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "dev:stable": "WATCHPACK_POLLING=true next dev --webpack",
     "build": "next build",
     "start": "next start",
     "lint": "biome check .",
@@ -17,6 +18,8 @@
     "db:seed": "tsx scripts/seed.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.1026.0",
+    "@aws-sdk/client-s3": "^3.1025.0",
     "@faker-js/faker": "^10.4.0",
     "@google/generative-ai": "^0.24.1",
     "dotenv": "^17.4.1",

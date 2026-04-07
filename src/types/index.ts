@@ -23,15 +23,35 @@ export interface ViolenceAnalysis {
   score: number;
   riskLevel: "low" | "medium" | "high" | "critical";
   patterns: ViolencePattern[];
+  cycleOfViolence: ViolenceCycleAnalysis;
   summary: string;
   recommendations: string[];
 }
 
 export interface ViolencePattern {
-  type: "control" | "threat" | "manipulation" | "isolation" | "verbal_abuse" | "stalking";
+  type:
+    | "control"
+    | "threat"
+    | "manipulation"
+    | "isolation"
+    | "verbal_abuse"
+    | "stalking"
+    | "gaslighting"
+    | "love_bombing";
   severity: number;
   evidence: string[];
   description: string;
+}
+
+export interface ViolenceCycleAnalysis {
+  stage:
+    | "tension"
+    | "explosion"
+    | "honeymoon"
+    | "mixed"
+    | "not_detected";
+  confidence: number;
+  evidence: string[];
 }
 
 export interface JudicialSearchResult {

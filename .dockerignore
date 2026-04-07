@@ -1,0 +1,14 @@
+.next
+.git
+node_modules
+*.log
+.env*
+docker-compose.yml
+Dockerfile
+README.md
+.drizzle
+dist
+coverage
+.vscode
+.idea
+*.md

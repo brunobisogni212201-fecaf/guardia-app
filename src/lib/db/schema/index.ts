@@ -9,6 +9,34 @@ import {
   jsonb,
 } from "drizzle-orm/pg-core";
 
+export const users = pgTable("users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userHash: text("user_hash").unique().notNull(),
+  emailHash: text("email_hash").unique().notNull(),
+  nameHash: text("name_hash"),
+  phoneHash: text("phone_hash"),
+  cpfHash: text("cpf_hash"),
+  cognitoSub: text("cognito_sub").unique(),
+  emailVerified: boolean("email_verified").default(false),
+  role: text("role").default("user"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const sessions = pgTable("sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => users.id),
+  token: text("token").unique().notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 export const conversations = pgTable("conversations", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id"),

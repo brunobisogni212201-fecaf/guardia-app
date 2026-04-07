@@ -4,6 +4,7 @@ import { parseText } from "@/lib/extractors/conversation";
 import { extractContactInfo } from "@/lib/extractors/phone";
 import { analyzeViolence } from "@/lib/analyzers/violence";
 import { Anonymizer } from "@/lib/anonymizer";
+import { archiveAnalysisToS3, isAwsArchiveEnabled } from "@/lib/cloud/aws-s3";
 
 export async function POST(request: NextRequest) {
   try {
@@ -82,11 +83,44 @@ export async function POST(request: NextRequest) {
       rawContent: anonymizedContent,
     });
 
+    let cloudArchive: { enabled: boolean; status: "disabled" | "stored" | "failed"; key?: string } = {
+      enabled: isAwsArchiveEnabled(),
+      status: "disabled",
+    };
+
+    if (cloudArchive.enabled) {
+      try {
+        const archiveKey = await archiveAnalysisToS3({
+          conversationId,
+          sourceType,
+          riskLevel: violenceAnalysis.riskLevel,
+          violenceScore: violenceAnalysis.score,
+          anonymizedContent,
+          createdAt: new Date().toISOString(),
+        });
+
+        if (archiveKey) {
+          cloudArchive = {
+            enabled: true,
+            status: "stored",
+            key: archiveKey,
+          };
+        }
+      } catch (archiveError) {
+        console.error("AWS archive error:", archiveError);
+        cloudArchive = {
+          enabled: true,
+          status: "failed",
+        };
+      }
+    }
+
     return NextResponse.json({
       conversationId,
       violenceScore: violenceAnalysis.score,
       riskLevel: violenceAnalysis.riskLevel,
       patterns: violenceAnalysis.patterns,
+      cycleOfViolence: violenceAnalysis.cycleOfViolence,
       summary: violenceAnalysis.summary,
       recommendations: violenceAnalysis.recommendations,
       contactFound: {
@@ -94,6 +128,7 @@ export async function POST(request: NextRequest) {
         name: contactInfo.name,
         cpf: contactInfo.cpf ? "encontrado" : "não encontrado",
       },
+      cloudArchive,
     });
   } catch (error) {
     console.error("Analysis error:", error);
