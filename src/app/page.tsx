@@ -1,65 +1,263 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+import type { ViolenceAnalysis, RiskLevel } from "@/types";
+
+function RiskBadge({ level }: { level: RiskLevel }) {
+  const styles = {
+    low: "bg-green-500/20 text-green-400 border-green-500/30",
+    medium: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+    high: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+    critical: "bg-red-500/20 text-red-400 border-red-500/30",
+  };
+
+  const labels = {
+    low: "Baixo",
+    medium: "Médio",
+    high: "Alto",
+    critical: "Crítico",
+  };
+
+  return (
+    <span
+      className={`px-3 py-1 rounded-full text-sm font-medium border ${styles[level]}`}
+    >
+      {labels[level]}
+    </span>
+  );
+}
+
+function ScoreGauge({ score }: { score: number }) {
+  const circumference = 2 * Math.PI * 45;
+  const strokeDashoffset = circumference - (score / 10) * circumference;
+  const color =
+    score >= 7 ? "#ef4444" : score >= 4 ? "#f59e0b" : "#22c55e";
+
+  return (
+    <div className="relative w-32 h-32">
+      <svg className="w-full h-full transform -rotate-90">
+        <circle
+          cx="64"
+          cy="64"
+          r="45"
+          stroke="currentColor"
+          strokeWidth="8"
+          fill="none"
+          className="text-zinc-700"
+        />
+        <circle
+          cx="64"
+          cy="64"
+          r="45"
+          stroke={color}
+          strokeWidth="8"
+          fill="none"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          className="transition-all duration-1000"
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-3xl font-bold" style={{ color }}>
+          {score.toFixed(1)}
+        </span>
+        <span className="text-xs text-zinc-400">/10</span>
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
+  const [text, setText] = useState("");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [result, setResult] = useState<{
+    score: number;
+    riskLevel: RiskLevel;
+    patterns: ViolenceAnalysis["patterns"];
+    summary: string;
+    recommendations: string[];
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleAnalyze = async () => {
+    if (!text.trim()) return;
+
+    setIsAnalyzing(true);
+    setError(null);
+    setResult(null);
+
+    try {
+      const response = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, sourceType: "text" }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erro ao analisar");
+      }
+
+      setResult(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro desconhecido");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <main className="min-h-screen bg-zinc-950 text-zinc-100">
+      <div className="max-w-4xl mx-auto px-6 py-12">
+        <header className="text-center mb-12">
+          <h1 className="text-4xl font-bold mb-2">
+            <span className="text-rose-400">Guardiã</span>
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="text-zinc-400">
+            Analisador de conversas para proteção de mulheres
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+        </header>
+
+        <section className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-zinc-300 mb-2">
+              Cole a conversa do WhatsApp
+            </label>
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder={`Cole aqui a conversa exportada do WhatsApp ou o texto colado...\n\nExemplo:\n12/03/2024 14:30 - João: Oi amor, onde você está?\n12/03/2024 14:31 - Maria: No trabalho ainda\n12/03/2024 14:32 - João: Já falou com aquele amigo seu de novo?`}
+              className="w-full h-64 bg-zinc-900 border border-zinc-700 rounded-lg p-4 text-sm font-mono text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-rose-400 focus:ring-1 focus:ring-rose-400 resize-none"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+          </div>
+
+          <button
+            onClick={handleAnalyze}
+            disabled={!text.trim() || isAnalyzing}
+            className="w-full py-3 bg-rose-500 hover:bg-rose-600 disabled:bg-zinc-700 disabled:cursor-not-allowed rounded-lg font-medium transition-colors"
           >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+            {isAnalyzing ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg
+                  className="animate-spin h-5 w-5"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    fill="none"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  />
+                </svg>
+                Analisando...
+              </span>
+            ) : (
+              "Analisar Conversa"
+            )}
+          </button>
+        </section>
+
+        {error && (
+          <div className="mt-6 p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400">
+            {error}
+          </div>
+        )}
+
+        {result && (
+          <section className="mt-12 space-y-6">
+            <h2 className="text-2xl font-bold">Resultado da Análise</h2>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6 flex flex-col items-center">
+                <h3 className="text-lg font-medium text-zinc-300 mb-4">
+                  Score de Risco
+                </h3>
+                <ScoreGauge score={result.score} />
+                <div className="mt-4">
+                  <RiskBadge level={result.riskLevel} />
+                </div>
+              </div>
+
+              <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6">
+                <h3 className="text-lg font-medium text-zinc-300 mb-4">
+                  Contato Identificado
+                </h3>
+                <p className="text-zinc-400 text-sm">{result.summary}</p>
+              </div>
+            </div>
+
+            {result.patterns.length > 0 && (
+              <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6">
+                <h3 className="text-lg font-medium text-zinc-300 mb-4">
+                  Padrões Identificados
+                </h3>
+                <ul className="space-y-3">
+                  {result.patterns.map((pattern, index) => (
+                    <li
+                      key={index}
+                      className="flex items-start gap-3 p-3 bg-zinc-800 rounded-lg"
+                    >
+                      <span
+                        className={`mt-1 w-2 h-2 rounded-full ${
+                          pattern.severity >= 7
+                            ? "bg-red-500"
+                            : pattern.severity >= 4
+                              ? "bg-yellow-500"
+                              : "bg-green-500"
+                        }`}
+                      />
+                      <div>
+                        <span className="font-medium text-rose-400 capitalize">
+                          {pattern.type.replace("_", " ")}
+                        </span>
+                        <p className="text-sm text-zinc-400 mt-1">
+                          {pattern.description}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {result.recommendations.length > 0 && (
+              <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-6">
+                <h3 className="text-lg font-medium text-rose-400 mb-4">
+                  Recomendações
+                </h3>
+                <ul className="space-y-2">
+                  {result.recommendations.map((rec, index) => (
+                    <li
+                      key={index}
+                      className="flex items-start gap-2 text-zinc-300"
+                    >
+                      <span className="text-rose-400">•</span>
+                      {rec}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </section>
+        )}
+
+        <footer className="mt-16 text-center text-zinc-500 text-sm">
+          <p>
+            Seus dados são processados e armazenados de forma anonimizada em
+            conformidade com a LGPD.
+          </p>
+        </footer>
+      </div>
+    </main>
   );
 }
