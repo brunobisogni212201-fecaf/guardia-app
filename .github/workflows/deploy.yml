@@ -1,0 +1,194 @@
+name: Deploy to AWS ECS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:          # permite trigger manual pela UI do GitHub
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false   # nunca cancela um deploy em andamento
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: guardia-app
+  ECS_CLUSTER: guardia-cluster
+  ECS_SERVICE: guardia-service
+  TASK_FAMILY: guardia-app
+  CONTAINER_NAME: guardia-app
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      # ── 1. Checkout ─────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── 2. Credenciais AWS ──────────────────────────────
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # ── 3. Login ECR ────────────────────────────────────
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # ── 4. Build & Push ─────────────────────────────────
+      - name: Build, tag and push image
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            -f Dockerfile .
+
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      # ── 5. Gera Task Definition com todas as env vars ───
+      - name: Generate ECS Task Definition
+        id: task-def
+        env:
+          IMAGE_URI: ${{ steps.build-image.outputs.image }}
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+        run: |
+          cat > task-def.json << EOJSON
+          {
+            "family": "${{ env.TASK_FAMILY }}",
+            "networkMode": "awsvpc",
+            "requiresCompatibilities": ["FARGATE"],
+            "cpu": "256",
+            "memory": "512",
+            "executionRoleArn": "arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/ecsTaskExecutionRole",
+            "containerDefinitions": [
+              {
+                "name": "${{ env.CONTAINER_NAME }}",
+                "image": "${IMAGE_URI}",
+                "essential": true,
+                "portMappings": [
+                  { "containerPort": 3000, "protocol": "tcp" }
+                ],
+                "environment": [
+                  { "name": "NODE_ENV",                        "value": "production" },
+                  { "name": "PORT",                            "value": "3000" },
+                  { "name": "HOSTNAME",                        "value": "0.0.0.0" },
+                  { "name": "AWS_REGION",                      "value": "${{ env.AWS_REGION }}" },
+                  { "name": "AWS_ACCESS_KEY_ID",               "value": "${{ secrets.AWS_ACCESS_KEY_ID }}" },
+                  { "name": "AWS_SECRET_ACCESS_KEY",           "value": "${{ secrets.AWS_SECRET_ACCESS_KEY }}" },
+                  { "name": "AWS_S3_BUCKET_ANALYSIS",          "value": "guardia-analysis-archive" },
+                  { "name": "AWS_S3_ENDPOINT",                 "value": "https://acessobucketguardia-rf113rcgmu8fz3ah5snm3zbp6f6mnuse1a-s3alias.s3.us-east-1.amazonaws.com" },
+                  { "name": "AWS_S3_FORCE_PATH_STYLE",         "value": "false" },
+                  { "name": "COGNITO_CLIENT_ID",               "value": "${{ secrets.COGNITO_CLIENT_ID }}" },
+                  { "name": "DATABASE_URL",                    "value": "${{ secrets.DATABASE_URL }}" },
+                  { "name": "GEMINI_API_KEY",                  "value": "${{ secrets.GEMINI_API_KEY }}" },
+                  { "name": "NEXT_PUBLIC_GOOGLE_MAPS_API_KEY", "value": "${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}" },
+                  { "name": "IP_HASH_SALT",                    "value": "${{ secrets.IP_HASH_SALT }}" }
+                ],
+                "logConfiguration": {
+                  "logDriver": "awslogs",
+                  "options": {
+                    "awslogs-group": "/ecs/guardia-app",
+                    "awslogs-region": "${{ env.AWS_REGION }}",
+                    "awslogs-stream-prefix": "ecs"
+                  }
+                }
+              }
+            ]
+          }
+          EOJSON
+          echo "task-definition=task-def.json" >> $GITHUB_OUTPUT
+
+      # ── 6. Registra Task Definition ─────────────────────
+      - name: Register task definition
+        id: register-task
+        run: |
+          TASK_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://task-def.json \
+            --region ${{ env.AWS_REGION }} \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+          echo "task-arn=${TASK_ARN}" >> $GITHUB_OUTPUT
+          echo "Registered: ${TASK_ARN}"
+
+      # ── 7. Atualiza serviço ECS ──────────────────────────
+      - name: Deploy to ECS
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ env.ECS_SERVICE }} \
+            --task-definition ${{ steps.register-task.outputs.task-arn }} \
+            --desired-count 1 \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }} \
+            --output text > /dev/null
+          echo "Force deploy iniciado"
+
+      # ── 8. Aguarda estabilização ─────────────────────────
+      - name: Wait for service stability
+        run: |
+          echo "Aguardando serviço estabilizar..."
+          aws ecs wait services-stable \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.ECS_SERVICE }} \
+            --region ${{ env.AWS_REGION }}
+          echo "✅ Serviço estável!"
+
+      # ── 9. Obtém URL e imprime resumo ────────────────────
+      - name: Get deployment URL
+        run: |
+          # Tenta pegar DNS do ALB primeiro
+          ALB_DNS=$(aws elbv2 describe-load-balancers \
+            --names guardia-alb \
+            --region ${{ env.AWS_REGION }} \
+            --query 'LoadBalancers[0].DNSName' \
+            --output text 2>/dev/null || echo "")
+
+          if [[ -n "$ALB_DNS" && "$ALB_DNS" != "None" ]]; then
+            APP_URL="http://${ALB_DNS}"
+          else
+            # Fallback: IP público da task
+            TASK_ARN=$(aws ecs list-tasks \
+              --cluster ${{ env.ECS_CLUSTER }} \
+              --service-name ${{ env.ECS_SERVICE }} \
+              --region ${{ env.AWS_REGION }} \
+              --query 'taskArns[0]' --output text)
+
+            ENI_ID=$(aws ecs describe-tasks \
+              --cluster ${{ env.ECS_CLUSTER }} \
+              --tasks "${TASK_ARN}" \
+              --region ${{ env.AWS_REGION }} \
+              --query 'tasks[0].attachments[0].details[?name==`networkInterfaceId`].value' \
+              --output text)
+
+            PUBLIC_IP=$(aws ec2 describe-network-interfaces \
+              --network-interface-ids "${ENI_ID}" \
+              --region ${{ env.AWS_REGION }} \
+              --query 'NetworkInterfaces[0].Association.PublicIp' \
+              --output text)
+
+            APP_URL="http://${PUBLIC_IP}:3000"
+          fi
+
+          echo ""
+          echo "================================================"
+          echo " ✅ Deploy concluído!"
+          echo " 🌐 URL: ${APP_URL}"
+          echo " 📦 Image: ${{ steps.build-image.outputs.image }}"
+          echo " 📋 Task: ${{ steps.register-task.outputs.task-arn }}"
+          echo "================================================"

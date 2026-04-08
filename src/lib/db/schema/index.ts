@@ -7,6 +7,7 @@ import {
   real,
   integer,
   jsonb,
+  index,
 } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
@@ -92,6 +93,28 @@ export const judicialRecords = pgTable("judicial_records", {
     .notNull()
     .defaultNow(),
 });
+
+// Tabela para mapa de pedidos de ajuda (dados anonimizados — LGPD)
+// IP nunca é armazenado; apenas hash SHA-256 + coords com ruído ±0.3°
+export const helpRequestsGeo = pgTable(
+  "help_requests_geo",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ipHash: text("ip_hash").notNull(),       // sha256(ip) — sem IP raw
+    lat: real("lat").notNull(),              // lat com ruído ±0.3° (~33 km)
+    lng: real("lng").notNull(),              // lng com ruído ±0.3°
+    region: text("region"),                  // nome do estado (sem cidade)
+    country: text("country").default("BR"),
+    cookieConsent: boolean("cookie_consent").default(true),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("help_requests_geo_created_idx").on(t.createdAt),
+    index("help_requests_geo_ip_hash_idx").on(t.ipHash),
+  ]
+);
 
 export const modelTraining = pgTable("model_training", {
   id: uuid("id").primaryKey().defaultRandom(),

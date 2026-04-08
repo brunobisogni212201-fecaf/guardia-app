@@ -14,8 +14,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Guardiã - Prevenção e Alertas",
-  description: "Ferramenta de prevenção e alerta. O silêncio não protege.",
+  title: "Guardiã — Prevenção da Violência Doméstica",
+  description: "Tecnologia de IA para detecção de padrões de violência. Gratuito, sigiloso e anônimo. O silêncio não protege — a informação sim.",
+  keywords: ["violência doméstica", "feminicídio", "proteção", "mulher", "prevenção"],
+  openGraph: {
+    title: "Guardiã — Prevenção da Violência Doméstica",
+    description: "Analise conversas com IA para detectar padrões de abuso. Gratuito e sigiloso.",
+    locale: "pt_BR",
+    type: "website",
+  },
 };
 
 export default function RootLayout({

@@ -16,8 +16,15 @@
     "db:studio": "drizzle-kit studio",
     "db:check": "drizzle-kit check",
     "db:seed": "tsx scripts/seed.ts",
+    "db:seed:geo": "tsx scripts/seed-geo.ts",
     "tunnel": "lt --port 3000 --subdomain guardia-dev",
-    "dev:tunnel": "concurrently \"npm run dev\" \"npm run tunnel\""
+    "dev:tunnel": "concurrently \"npm run dev\" \"npm run tunnel\"",
+    "deploy": "bash scripts/deploy.sh",
+    "deploy:fast": "bash scripts/deploy.sh --skip-build",
+    "setup:alb": "bash scripts/setup-alb.sh",
+    "logs": "aws logs tail /ecs/guardia-app --follow --region us-east-1",
+    "status": "aws ecs describe-services --cluster guardia-cluster --services guardia-service --region us-east-1 --query 'services[0].{Status:status,Running:runningCount,Desired:desiredCount,Task:taskDefinition}' --output table",
+    "url": "echo 'http://guardia-alb-1653604039.us-east-1.elb.amazonaws.com'"
   },
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.1026.0",
@@ -37,6 +44,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.4.10",
     "@tailwindcss/postcss": "^4",
+    "@types/google.maps": "^3.58.1",
     "@types/node": "^20",
     "@types/pg": "^8.20.0",
     "@types/react": "^19",
