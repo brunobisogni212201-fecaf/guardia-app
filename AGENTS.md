@@ -234,8 +234,83 @@ AWS_S3_BUCKET_ANALYSIS=guardia-uploads-us-east-1
 
 ---
 
+## CI/CD Pipeline
+
+### Fluxo de Deploy
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   PR/merge  │────▶│    Test     │────▶│   Build     │
+│  develop    │     │  Quality    │     │   Staging   │
+└─────────────┘     └─────────────┘     └─────────────┘
+                                              │
+┌─────────────┐     ┌─────────────┐            ▼
+│  Rollback   │◀────│   Deploy    │◀──── ┌─────────────┐
+│  on fail    │     │ Production  │      │   Build     │
+└─────────────┘     └─────────────┘      │   Main      │
+                                         └─────────────┘
+```
+
+### Ambientes
+
+| Ambiente | Branch | URL | Auto-deploy |
+|----------|--------|-----|------------|
+| Staging | develop | https://staging.irisregistro.qzz.io | ✅ Sim |
+| Production | main | https://irisregistro.qzz.io | ✅ Sim |
+
+### GitHub Secrets Necessários
+
+Configure os secrets via `./scripts/setup-github-secrets.sh` ou manualmente:
+
+```bash
+gh secret set AWS_ACCESS_KEY_ID --body "AKIA..."
+gh secret set AWS_SECRET_ACCESS_KEY --body "..."
+gh secret set AWS_ACCOUNT_ID --body "026544697783"
+gh secret set DATABASE_URL --body "postgres://..."
+gh secret set AUTH0_DOMAIN --body "guardial-app.us.auth0.com"
+gh secret set AUTH0_CLIENT_ID --body "..."
+gh secret set AUTH0_CLIENT_SECRET --body "..."
+gh secret set GEMINI_API_KEY --body "..."
+gh secret set APICPF_API_KEY --body "..."
+gh secret set DATAJUD_API_KEY --body "..."
+gh secret set SES_SMTP_HOST --body "email-smtp.us-east-1.amazonaws.com"
+gh secret set SES_FROM_EMAIL --body "contato@irisregistro.qzz.io"
+gh secret set APP_URL --body "https://irisregistro.qzz.io"
+gh secret set ECS_SERVICE_PROD --body "guardia-service"
+```
+
+### Scripts de Setup
+
+```bash
+# 1. Configurar GitHub Secrets
+./scripts/setup-github-secrets.sh
+
+# 2. Criar ambiente staging (se não existir)
+./scripts/setup-staging.sh
+
+# 3. Configurar SES para email transacional
+./scripts/setup-ses.sh
+
+# 4. Deploy manual (se necessário)
+./scripts/deploy.sh
+```
+
+### AWS SES - Email Transacional
+
+Templates configurados:
+- `IrisBemVinda` - Email de boas-vindas
+- `IrisAnaliseCompleta` - Notificação de análise pronta
+- `IrisAlertaRisco` - Alerta de segurança
+
+Para ativar email em produção:
+1. AWS Console > SES > Account Dashboard
+2. Clicar em "Request Production Access"
+3. Aguardar aprovação da AWS (24-48h)
+
+---
+
 Última atualização: 2026-04-09
-Status: Build ✅ | Deploy pendente
+Status: Build ✅ | CI/CD ✅ | SES ✅
 
 ### Build Status
 ```
@@ -245,16 +320,14 @@ Route (app)                  Revalidate  Expire
 ├ ○ /buscas                  Busca preventiva
 ├ ○ /dashboard               Dashboard
 ├ ○ /evidence                Íris Registro
-└ ○ /privacy                 Privacidade
+├ ○ /privacy                 Privacidade
+└ ○ /api/health              Health check
 ```
 
-### Próximos Passos
-1. Deploy na AWS (rodar `./scripts/deploy.sh`)
-2. Configurar Route 53 + ACM para HTTPS
-3. Configurar Secrets Manager para credenciais
-
 ### Configuração Atual
-- **Task Definition**: guardia-app:8 (amd64)
+- **Task Definition**: guardia-app-prod (amd64)
 - **RDS**: guardia-db-new (guardia/Guardia2024)
-- **ECR**: guardia-app:amd64
-- **Cognito**: us-east-1_iwU4xEMtV
+- **ECR**: guardia-app
+- **Auth0**: guardial-app.us.auth0.com
+- **SES**: Configurado (pending production access)
+- **CI/CD**: GitHub Actions ✅
