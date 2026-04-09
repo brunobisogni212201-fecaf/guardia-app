@@ -183,6 +183,10 @@ export async function POST(request: NextRequest) {
 
     const geoData = await getAddressByCEP(cep);
 
+    if (!tempSession.userId) {
+      return NextResponse.json({ error: "Sessão inválida" }, { status: 400 });
+    }
+
     const cpfHash = hashData(cpf);
     const whatsappHash = hashData(whatsapp);
     const cepHash = hashData(cep);
@@ -211,8 +215,9 @@ export async function POST(request: NextRequest) {
       expiresAt,
     });
 
+    const userId = tempSession.userId;
     const user = await db.query.users.findFirst({
-      where: eq(users.id, tempSession.userId),
+      where: userId ? eq(users.id, userId) : undefined,
     });
 
     if (user) {
