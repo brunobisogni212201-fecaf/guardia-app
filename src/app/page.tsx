@@ -208,7 +208,8 @@ function AuthModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }
   });
 
   const handleGoogleLogin = () => {
-    window.location.href = `https://guardial-app.us.auth0.com/authorize?response_type=code&client_id=vF9Vtuj0vpQbqlrVX5dqIAYct6wJnOyc&redirect_uri=${encodeURIComponent("https://irisregistro.qzz.io/api/auth/callback")}&scope=openid profile email&state=${mode}`;
+    const auth0Url = `https://guardial-app.us.auth0.com/authorize?response_type=code&client_id=5ouCg6pFwQH9TmvSl2Vnf38ajTAU9k4T&redirect_uri=${encodeURIComponent("https://irisregistro.qzz.io/api/auth/callback/google")}&scope=openid profile email&state=${mode}&connection=google-oauth2`;
+    window.location.href = auth0Url;
   };
 
   useEffect(() => {
