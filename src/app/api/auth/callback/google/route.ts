@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
 
     const email = userInfo.email;
     const name = userInfo.name;
+    const picture = userInfo.picture;
     const auth0Id = userInfo.sub;
 
     const emailHash = hashData(email);
@@ -66,41 +67,92 @@ export async function GET(request: NextRequest) {
       where: eq(users.emailHash, emailHash),
     });
 
-    if (!user) {
-      const userHash = hashData(`${email}:${Date.now()}`);
-      const nameHash = name ? hashData(name) : null;
+    if (user) {
+      if (!user.cpfHash || !user.whatsappHash) {
+        const tempToken = generateToken();
+        const tempExpires = new Date();
+        tempExpires.setMinutes(tempExpires.getMinutes() + 30);
 
-      const result = await db.insert(users).values({
-        userHash,
-        emailHash,
-        nameHash,
-        auth0Sub: auth0Id,
-        auth0Provider: "google",
-        role: "user",
-        emailVerified: true,
-      }).returning();
+        await db.insert(sessions).values({
+          userId: user.id,
+          token: tempToken,
+          expiresAt: tempExpires,
+        });
 
-      user = result[0];
+        const response = NextResponse.redirect(
+          new URL(`/register?step=complete&token=${tempToken}`, request.url)
+        );
+
+        response.cookies.set("temp_token", tempToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          maxAge: 60 * 30,
+          path: "/",
+        });
+
+        return response;
+      }
+
+      const sessionToken = generateToken();
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+
+      await db.insert(sessions).values({
+        userId: user.id,
+        token: sessionToken,
+        expiresAt,
+      });
+
+      const response = NextResponse.redirect(
+        new URL("/dashboard", request.url)
+      );
+
+      response.cookies.set("auth_token", sessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 7,
+        path: "/",
+      });
+
+      return response;
     }
 
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
+    const userHash = hashData(`${email}:${Date.now()}`);
+    const nameHash = name ? hashData(name) : null;
 
-    const sessionToken = generateToken();
+    const result = await db.insert(users).values({
+      userHash,
+      emailHash,
+      nameHash,
+      auth0Sub: auth0Id,
+      auth0Provider: "google",
+      role: "user",
+      emailVerified: true,
+    }).returning();
+
+    user = result[0];
+
+    const tempToken = generateToken();
+    const tempExpires = new Date();
+    tempExpires.setMinutes(tempExpires.getMinutes() + 30);
 
     await db.insert(sessions).values({
       userId: user.id,
-      token: sessionToken,
-      expiresAt,
+      token: tempToken,
+      expiresAt: tempExpires,
     });
 
-    const response = NextResponse.redirect(new URL("/dashboard", request.url));
+    const response = NextResponse.redirect(
+      new URL(`/register?step=complete&token=${tempToken}&name=${encodeURIComponent(name || "")}&email=${encodeURIComponent(email)}`, request.url)
+    );
 
-    response.cookies.set("auth_token", sessionToken, {
+    response.cookies.set("temp_token", tempToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7,
+      maxAge: 60 * 30,
       path: "/",
     });
 
