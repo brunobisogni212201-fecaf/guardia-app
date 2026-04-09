@@ -295,7 +295,73 @@ gh secret set ECS_SERVICE_PROD --body "guardia-service"
 ./scripts/deploy.sh
 ```
 
-### AWS SES - Email Transacional
+---
+
+## CI/CD AWS Nativo (Sem GitHub Actions)
+
+Se você não tem GitHub Actions, use um dos scripts abaixo:
+
+### Opção 1: CodePipeline + CodeCommit (Recomendado)
+```bash
+# Cria CodeCommit + CodePipeline + EventBridge + Lambda
+./scripts/setup-aws-codepipeline.sh
+```
+
+### Opção 2: Auto-Deploy via EventBridge
+```bash
+# Cria CodeCommit + Lambda + EventBridge para auto-deploy
+./scripts/setup-auto-deploy.sh
+```
+
+### Opção 3: GitHub Webhook + CodePipeline
+```bash
+# Usa GitHub como source (requer GitHub token)
+./scripts/setup-aws-cicd-github.sh
+```
+
+### Opção 4: CodePipeline Completo (CLI)
+```bash
+# Cria tudo via AWS CLI
+./scripts/setup-aws-cicd.sh
+```
+
+### Fluxo AWS CodePipeline
+
+```
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│  CodeCommit  │────▶│  CodeBuild   │────▶│   S3 Artif.  │────▶│    ECS       │
+│  ou GitHub   │     │  npm build  │     │  imageref    │     │  Deploy      │
+└──────────────┘     └──────────────┘     └──────────────┘     └──────────────┘
+      │                    │                                           │
+      ▼                    ▼                                           ▼
+┌──────────────┐     ┌──────────────┐                         ┌──────────────┐
+│  EventBridge │────▶│    Lambda    │                         │  CloudWatch  │
+│  (trigger)   │     │  (orchestr.) │                         │  (logs)      │
+└──────────────┘     └──────────────┘                         └──────────────┘
+```
+
+### Comandos úteis AWS
+
+```bash
+# Ver pipelines
+aws codepipeline list-pipelines --region us-east-1
+
+# Ver status do build
+aws codebuild list-builds --project-name guardia-app-build --region us-east-1
+
+# Trigger manual
+aws codebuild start-build --project-name guardia-app-build --region us-east-1
+
+# Ver logs
+aws logs tail /ecs/guardia-app --follow --region us-east-1
+
+# Status ECS
+aws ecs describe-services --cluster guardia-cluster --services guardia-service --region us-east-1
+```
+
+---
+
+## AWS SES - Email Transacional
 
 Templates configurados:
 - `IrisBemVinda` - Email de boas-vindas
@@ -310,7 +376,7 @@ Para ativar email em produção:
 ---
 
 Última atualização: 2026-04-09
-Status: Build ✅ | CI/CD ✅ | SES ✅
+Status: Build ✅ | CI/CD AWS ✅ | SES ✅
 
 ### Build Status
 ```
@@ -330,4 +396,4 @@ Route (app)                  Revalidate  Expire
 - **ECR**: guardia-app
 - **Auth0**: guardial-app.us.auth0.com
 - **SES**: Configurado (pending production access)
-- **CI/CD**: GitHub Actions ✅
+- **CI/CD**: AWS CodePipeline + CodeBuild + EventBridge ✅
