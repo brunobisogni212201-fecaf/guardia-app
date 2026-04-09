@@ -35,7 +35,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ### Endpoint de Produção
 ```
-http://44.204.117.169:3000
+https://irisregistro.qzz.io (Configuração DNS pendente)
+http://guardia-alb-1653604039.us-east-1.elb.amazonaws.com (ALB)
+http://44.204.117.169:3000 (IP direto)
 ```
 
 ### Database RDS
@@ -186,12 +188,27 @@ AWS_S3_BUCKET_ANALYSIS=guardia-uploads-us-east-1
 
 ---
 
-## Novas Funcionalidades (2026-04-07)
+## Novas Funcionalidades (2026-04-09)
+
+### Design System Íris
+- Paleta de cores: Base (cinzas), Suporte (petróleo/lavanda), Accent (coral)
+- Componentes: Button, Input, Textarea, Card, Badge, Alert, Timeline, Tabs
+- Tokens de design em CSS variables
+- Microcopy completo em PT-BR
+- Tom "tech humano, calmo, acolhedor" - sem estética policial
 
 ### Landing Page
 - Hero com copy impactante sobre violência feminina
 - Dados reais (Atlas da Violência 2025, Anuário Segurança Pública 2025)
 - Modal de Auth com Login/Register
+
+### Páginas Atualizadas com Novo Design
+- `/` - Landing Page ✅
+- `/dashboard` - Dashboard protegido ✅
+- `/analyze` - Página de análise de conversas ✅ (NOVA)
+- `/evidence` - Íris Registro ✅ (NOVA)
+- `/privacy` - Política de Privacidade ✅ (ATUALIZADA)
+- `/buscas` - Busca preventiva (CPF + Antecedentes) ✅ (NOVA)
 
 ### Autenticação Cognito
 - User Pool: `us-east-1_iwU4xEMtV`
@@ -203,19 +220,38 @@ AWS_S3_BUCKET_ANALYSIS=guardia-uploads-us-east-1
 - Tabela `sessions` para gestão de tokens
 - Middleware para proteção de rotas
 
-### Novas Rotas API
+### Fase 1 - Busca Preventiva
+- `src/shared/lib/services/cpf.ts` - integração apicpf.com
+- `src/shared/lib/services/datajud.ts` - integração CNJ (32 tribunais)
+- `src/shared/lib/services/rate-limit.ts` - 10 consultas/hora por IP
+- `POST /api/busca/cpf` - endpoint consulta CPF
+- `POST /api/busca/antecedentes` - endpoint consulta antecedentes
+
+### Rotas API
 - `POST /api/auth/signup` - Criar conta (dados anonimizados)
 - `POST /api/auth/signin` - Login (retorna cookie httponly)
-
-### Páginas
-- `/` - Landing Page
-- `/dashboard` - Dashboard protegido
-- `/analyze` - Página de análise
+- `POST /api/analyze` - Análise de conversa com Gemini
 
 ---
 
-Última atualização: 2026-04-07
-Status: ✅ ONLINE! App rodando em http://35.172.182.107:3000
+Última atualização: 2026-04-09
+Status: Build ✅ | Deploy pendente
+
+### Build Status
+```
+Route (app)                  Revalidate  Expire
+┌ ○ /                        Landing page
+├ ○ /analyze                 Análise de conversas
+├ ○ /buscas                  Busca preventiva
+├ ○ /dashboard               Dashboard
+├ ○ /evidence                Íris Registro
+└ ○ /privacy                 Privacidade
+```
+
+### Próximos Passos
+1. Deploy na AWS (rodar `./scripts/deploy.sh`)
+2. Configurar Route 53 + ACM para HTTPS
+3. Configurar Secrets Manager para credenciais
 
 ### Configuração Atual
 - **Task Definition**: guardia-app:8 (amd64)

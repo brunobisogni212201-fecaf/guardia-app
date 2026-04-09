@@ -1,0 +1,280 @@
+{
+  "brand": {
+    "name": "Íris",
+    "tagline": "Clareza para decisões",
+    "description": "Tecnologia acolhedora para proteção e apoio à tomada de decisão"
+  },
+
+  "navigation": {
+    "home": "Início",
+    "dashboard": "Painel",
+    "analyze": "Analisar",
+    "evidence": "Registro",
+    "search": "Busca",
+    "subscription": "Assinatura",
+    "profile": "Perfil",
+    "settings": "Configurações",
+    "logout": "Sair",
+    "login": "Entrar",
+    "register": "Cadastrar",
+    "pricing": "Planos"
+  },
+
+  "landing": {
+    "hero": {
+      "title": "Você não está sozinha",
+      "subtitle": "Tecnologia acolhedora para clareza e proteção. Entenda padrões, preserve evidências e tome decisões com segurança.",
+      "cta_primary": "Começar agora",
+      "cta_secondary": "Conhecer mais"
+    },
+    "stats": {
+      "title": "A realidade que os dados revelam",
+      "femicides": "Feminicídios registrados",
+      "aggression": "Uma mulher é vítima de agressão",
+      "silence": "Vítimas não denunciam",
+      "home": "Violência acontece em casa",
+      "per_day": "por dia",
+      "every_minutes": "a cada {minutes} min",
+      "dont_report": "por medo ou dependência",
+      "occur_home": "no lar brasileiro"
+    },
+    "features": {
+      "title": "Feito para você",
+      "privacy": {
+        "title": "Sua privacidade em primeiro lugar",
+        "description": "Dados criptografados, acesso apenas seu. Nenhuma informação é compartilhada."
+      },
+      "clarity": {
+        "title": "Clareza para entender",
+        "description": "Análise de conversas com linguagem simples e padrões claros."
+      },
+      "evidence": {
+        "title": "Preserve evidências",
+        "description": "Registre e armazene provas de forma segura com timestamps e hash."
+      },
+      "support": {
+        "title": "Apoio quando precisar",
+        "description": "Conexão direta com redes de apoio e serviços de emergência."
+      }
+    },
+    "plans": {
+      "title": "Planos acessíveis",
+      "subtitle": "Escolha o que faz sentido para você",
+      "essential": {
+        "name": "Essencial",
+        "price": "R$ 29,90",
+        "period": "por mês",
+        "features": ["5 análises de conversa", "Registro de evidências", "Suporte por email"]
+      },
+      "protection": {
+        "name": "Proteção",
+        "price": "R$ 49,90",
+        "period": "por mês",
+        "features": ["15 análises de conversa", "Registro ilimitado", "Busca preventiva", "Suporte prioritário"]
+      },
+      "premium": {
+        "name": "Premium",
+        "price": "R$ 99,90",
+        "period": "por mês",
+        "features": ["Análises ilimitadas", "Registro ilimitado", "Busca completa", "Compartilhamento seguro", "Suporte 24h"]
+      }
+    },
+    "faq": {
+      "title": "Perguntas frequentes",
+      "is_safe": {
+        "q": "Meus dados estão seguros?",
+        "a": "Sim. Todos os dados são criptografados e apenas você tem acesso. Não compartilhamos informações com terceiros."
+      },
+      "is_free": {
+        "q": "O Íris é gratuito?",
+        "a": "Oferecemos um plano gratuito com funcionalidades básicas. Planos pagos oferecem análises ilimitadas e recursos avançados."
+      },
+      "is_legal": {
+        "q": "É legal usar o Íris?",
+        "a": "Sim. O Íris é uma ferramenta de conscientização e preservação de evidências. Não substitui orientação jurídica profissional."
+      }
+    }
+  },
+
+  "auth": {
+    "login": {
+      "title": "Entrar",
+      "email": "Email",
+      "password": "Senha",
+      "submit": "Entrar com segurança",
+      "forgot": "Esqueceu a senha?",
+      "no_account": "Não tem uma conta?",
+      "register_link": "Cadastre-se"
+    },
+    "register": {
+      "title": "Criar conta",
+      "name": "Nome",
+      "email": "Email",
+      "password": "Senha",
+      "confirm_password": "Confirmar senha",
+      "submit": "Criar conta segura",
+      "has_account": "Já tem uma conta?",
+      "login_link": "Entrar",
+      "terms": "Ao criar uma conta, você concorda com nossos Termos de Uso e Política de Privacidade."
+    },
+    "verify": {
+      "title": "Verificar email",
+      "subtitle": "Enviamos um código para {email}",
+      "code_placeholder": "000000",
+      "submit": "Confirmar código",
+      "resend": "Não recebeu? Reenviar código"
+    },
+    "errors": {
+      "invalid_credentials": "Email ou senha incorretos",
+      "email_exists": "Este email já está cadastrado",
+      "weak_password": "A senha deve ter pelo menos 8 caracteres",
+      "passwords_dont_match": "As senhas não coincidem",
+      "email_required": "Email é obrigatório",
+      "password_required": "Senha é obrigatória"
+    }
+  },
+
+  "dashboard": {
+    "welcome": "Bem-vinda ao Íris",
+    "quick_actions": "Ações rápidas",
+    "recent_activity": "Atividade recente",
+    "analyze_chat": "Analisar conversa",
+    "add_evidence": "Adicionar evidência",
+    "preventive_search": "Busca preventiva",
+    "view_subscription": "Ver assinatura",
+    "no_activity": "Nenhuma atividade ainda",
+    "start_now": "Comece agora"
+  },
+
+  "analyze": {
+    "title": "Analisar conversa",
+    "subtitle": "Cole o texto de uma conversa para análise",
+    "input_placeholder": "Cole aqui o texto da conversa...",
+    "submit": "Analisar",
+    "analyzing": "Analisando...",
+    "result_title": "Resultado da análise",
+    "risk_level": "Nível de risco",
+    "patterns_detected": "Padrões detectados",
+    "recommendations": "Recomendações",
+    "save_evidence": "Salvar no Registro",
+    "risk_levels": {
+      "low": "Baixo",
+      "medium": "Médio",
+      "high": "Alto",
+      "critical": "Crítico"
+    },
+    "patterns": {
+      "control": "Controle",
+      "threat": "Ameaças",
+      "manipulation": "Manipulação",
+      "isolation": "Isolamento",
+      "verbal_abuse": "Abuso verbal",
+      "stalking": "Perseguição",
+      "gaslighting": "Manipulação emocional",
+      "love_bombing": "Idealização excessiva"
+    },
+    "privacy_note": "Sua conversa é analisada localmente e nunca é armazenada em texto puro."
+  },
+
+  "evidence": {
+    "title": "Íris Registro",
+    "subtitle": "Suas evidências preservadas com segurança",
+    "upload": "Enviar arquivo",
+    "upload_description": "Arraste arquivos aqui ou clique para selecionar",
+    "supported_formats": "Formatos: PDF, imagens, documentos",
+    "timeline_title": "Linha do tempo",
+    "empty_title": "Nenhuma evidência registrada",
+    "empty_description": "Comece adicionando arquivos, prints ou documentos importantes.",
+    "file_info": {
+      "name": "Nome",
+      "size": "Tamanho",
+      "date": "Data",
+      "hash": "Hash de integridade",
+      "status": "Status"
+    },
+    "share": "Compartilhar",
+    "share_title": "Criar link de compartilhamento",
+    "share_description": "Gere um link temporário para compartilhar com profissionais de segurança",
+    "copy_link": "Copiar link",
+    "revoke": "Revogar acesso",
+    "link_copied": "Link copiado!",
+    "link_expires": "Este link expira em {hours} horas",
+    "upload_success": "Arquivo enviado com sucesso",
+    "delete_confirm": "Tem certeza que deseja excluir esta evidência?"
+  },
+
+  "search": {
+    "title": "Busca preventiva",
+    "subtitle": "Consulte CPF e antecedentes de forma segura",
+    "cpf_tab": "Consultar CPF",
+    "cpf_placeholder": "000.000.000-00",
+    "antecedents_tab": "Antecedentes",
+    "name_placeholder": "Nome completo",
+    "search": "Buscar",
+    "searching": "Buscando...",
+    "searching_tribunals": "Buscando em tribunais...",
+    "results": "Resultados",
+    "no_results": "Nenhum resultado encontrado",
+    "processos_encontrados": "{count} processos encontrados",
+    "processos_criminais": "Processos criminais",
+    "processos_civeis": "Processos cíveis",
+    "rate_limit": "Limite de consultas excedido",
+    "try_again": "Tente novamente em {minutes} minutos"
+  },
+
+  "toast": {
+    "success": "Ação realizada com sucesso",
+    "error": "Algo deu errado",
+    "copied": "Copiado para a área de transferência",
+    "saved": "Salvo com sucesso",
+    "deleted": "Excluído com sucesso"
+  },
+
+  "empty": {
+    "no_data": "Sem dados",
+    "no_results": "Nenhum resultado encontrado",
+    "try_again": "Tente novamente"
+  },
+
+  "loading": {
+    "default": "Carregando...",
+    "processing": "Processando...",
+    "saving": "Salvando..."
+  },
+
+  "errors": {
+    "generic": "Algo deu errado. Tente novamente.",
+    "network": "Erro de conexão. Verifique sua internet.",
+    "unauthorized": "Faça login para continuar.",
+    "not_found": "Não encontrado",
+    "server_error": "Erro no servidor. Tente mais tarde."
+  },
+
+  "privacy": {
+    "title": "Sua privacidade",
+    "we_collect": "O que coletamos",
+    "we_dont_collect": "O que NÃO coletamos",
+    "data_usage": "Como usamos seus dados",
+    "your_rights": "Seus direitos (LGPD)",
+    "security": "Segurança",
+    "contact": "Fale conosco"
+  },
+
+  "footer": {
+    "copyright": "© {year} Íris. Todos os direitos reservados.",
+    "privacy": "Privacidade",
+    "terms": "Termos de uso",
+    "contact": "Contato",
+    "emergency": "Emergência?",
+    "disclaimer": "O Íris é uma ferramenta de conscientização. Em situações de emergência, ligue 190 ou 180."
+  },
+
+  "accessibility": {
+    "menu": "Menu",
+    "close": "Fechar",
+    "loading": "Carregando",
+    "previous": "Anterior",
+    "next": "Próximo",
+    "required_field": "Campo obrigatório"
+  }
+}

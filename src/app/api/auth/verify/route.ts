@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cognitoClient as client } from "@/lib/auth/cognito";
+import { cognitoClient as client } from "@/features/auth/lib/cognito";
 import { ConfirmSignUpCommand } from "@aws-sdk/client-cognito-identity-provider";
-import { db } from "@/lib/db/client";
-import { users } from "@/lib/db/schema";
-import { hashData } from "@/lib/auth/utils";
+import { db, users } from "@/shared/lib/db";
+import { hashData } from "@/shared/lib/utils/hash";
 import { eq } from "drizzle-orm";
 
 export async function POST(request: NextRequest) {

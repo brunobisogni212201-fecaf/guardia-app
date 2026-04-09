@@ -1,0 +1,183 @@
+{
+  "name": "Íris Design System",
+  "version": "1.0.0",
+  "description": "Design tokens para Íris - Tech humano, calmo e acolhedor",
+
+  "colors": {
+    "base": {
+      "white": "#FFFFFF",
+      "50": "#FAFAFA",
+      "100": "#F4F4F5",
+      "200": "#E4E4E7",
+      "300": "#D4D4D8",
+      "400": "#A1A1AA",
+      "500": "#71717A",
+      "600": "#52525B",
+      "700": "#3F3F46",
+      "800": "#27272A",
+      "900": "#18181B",
+      "950": "#09090B",
+      "black": "#000000"
+    },
+    "support": {
+      "lavender": {
+        "50": "#F8F7FF",
+        "100": "#F0EFFF",
+        "200": "#E4DFFF",
+        "300": "#C9B8FF",
+        "400": "#A78BFA",
+        "500": "#8B5CF6",
+        "600": "#7C3AED",
+        "700": "#6D28D9",
+        "800": "#5B21B6",
+        "900": "#4C1D95"
+      },
+      "petroleum": {
+        "50": "#F0F9F9",
+        "100": "#E0F2F2",
+        "200": "#BDE5E5",
+        "300": "#7DD3D3",
+        "400": "#3DBDBD",
+        "500": "#0D9488",
+        "600": "#0F766E",
+        "700": "#115E59",
+        "800": "#134E4A",
+        "900": "#042F2E"
+      }
+    },
+    "accent": {
+      "coral": {
+        "50": "#FFF7F5",
+        "100": "#FFE8E3",
+        "200": "#FFD4CC",
+        "300": "#FFB5A6",
+        "400": "#FF8A73",
+        "500": "#F97066",
+        "600": "#E54D3D",
+        "700": "#C12D22",
+        "800": "#A21F18",
+        "900": "#851A13"
+      },
+      "rose": {
+        "50": "#FFF1F2",
+        "100": "#FFE4E6",
+        "200": "#FECDD3",
+        "300": "#FDA4AF",
+        "400": "#FB7185",
+        "500": "#F43F5E",
+        "600": "#E11D48",
+        "700": "#BE123C",
+        "800": "#9F1239",
+        "900": "#881337"
+      }
+    },
+    "semantic": {
+      "success": "#0D9488",
+      "warning": "#D97706",
+      "error": "#DC2626",
+      "info": "#2563EB"
+    },
+    "risk": {
+      "low": {
+        "bg": "#ECFDF5",
+        "text": "#065F46",
+        "border": "#A7F3D0"
+      },
+      "medium": {
+        "bg": "#FFFBEB",
+        "text": "#92400E",
+        "border": "#FCD34D"
+      },
+      "high": {
+        "bg": "#FFF7ED",
+        "text": "#9A3412",
+        "border": "#FDBA74"
+      },
+      "critical": {
+        "bg": "#FEF2F2",
+        "text": "#991B1B",
+        "border": "#FECACA"
+      }
+    }
+  },
+
+  "typography": {
+    "fontFamily": {
+      "sans": ["Inter", "system-ui", "sans-serif"],
+      "mono": ["JetBrains Mono", "Consolas", "monospace"]
+    },
+    "fontSize": {
+      "xs": ["0.75rem", { "lineHeight": "1rem", "letterSpacing": "0.025em" }],
+      "sm": ["0.875rem", { "lineHeight": "1.25rem", "letterSpacing": "0.025em" }],
+      "base": ["1rem", { "lineHeight": "1.5rem", "letterSpacing": "0" }],
+      "lg": ["1.125rem", { "lineHeight": "1.75rem", "letterSpacing": "0" }],
+      "xl": ["1.25rem", { "lineHeight": "1.75rem", "letterSpacing": "0" }],
+      "2xl": ["1.5rem", { "lineHeight": "2rem", "letterSpacing": "-0.025em" }],
+      "3xl": ["1.875rem", { "lineHeight": "2.25rem", "letterSpacing": "-0.025em" }],
+      "4xl": ["2.25rem", { "lineHeight": "2.5rem", "letterSpacing": "-0.025em" }],
+      "5xl": ["3rem", { "lineHeight": "1.1", "letterSpacing": "-0.05em" }],
+      "6xl": ["3.75rem", { "lineHeight": "1", "letterSpacing": "-0.05em" }]
+    },
+    "fontWeight": {
+      "normal": "400",
+      "medium": "500",
+      "semibold": "600",
+      "bold": "700",
+      "extrabold": "800",
+      "black": "900"
+    }
+  },
+
+  "spacing": {
+    "0": "0",
+    "1": "0.25rem",
+    "2": "0.5rem",
+    "3": "0.75rem",
+    "4": "1rem",
+    "5": "1.25rem",
+    "6": "1.5rem",
+    "8": "2rem",
+    "10": "2.5rem",
+    "12": "3rem",
+    "16": "4rem",
+    "20": "5rem",
+    "24": "6rem",
+    "32": "8rem",
+    "40": "10rem",
+    "48": "12rem",
+    "64": "16rem"
+  },
+
+  "borderRadius": {
+    "none": "0",
+    "sm": "0.25rem",
+    "md": "0.5rem",
+    "lg": "0.75rem",
+    "xl": "1rem",
+    "2xl": "1.5rem",
+    "3xl": "2rem",
+    "full": "9999px"
+  },
+
+  "shadow": {
+    "sm": "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+    "md": "0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.07)",
+    "lg": "0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.08)",
+    "xl": "0 20px 25px -5px rgb(0 0 0 / 0.08), 0 8px 10px -6px rgb(0 0 0 / 0.08)",
+    "inner": "inset 0 2px 4px 0 rgb(0 0 0 / 0.05)"
+  },
+
+  "transition": {
+    "fast": "150ms cubic-bezier(0.4, 0, 0.2, 1)",
+    "base": "200ms cubic-bezier(0.4, 0, 0.2, 1)",
+    "slow": "300ms cubic-bezier(0.4, 0, 0.2, 1)"
+  },
+
+  "zIndex": {
+    "dropdown": "1000",
+    "sticky": "1100",
+    "modal": "1200",
+    "popover": "1300",
+    "tooltip": "1400"
+  }
+}

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db/client";
-import { sessions } from "@/lib/db/schema";
+import { db, sessions } from "@/shared/lib/db";
 import { eq } from "drizzle-orm";
 
 export async function POST(request: NextRequest) {

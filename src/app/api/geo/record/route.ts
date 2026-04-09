@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHash, randomBytes } from "node:crypto";
-import { db } from "@/lib/db/client";
-import { helpRequestsGeo } from "@/lib/db/schema";
+import { db } from "@/shared/lib/db";
+import { helpRequestsGeo } from "@/shared/lib/db/schema";
 import { eq, and, gte } from "drizzle-orm";
 
 // Adiciona ruído aleatório ±range aos coords para anonimização

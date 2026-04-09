@@ -27,6 +27,7 @@
     "url": "echo 'http://guardia-alb-1653604039.us-east-1.elb.amazonaws.com'"
   },
   "dependencies": {
+    "@auth0/nextjs-auth0": "^4.17.0",
     "@aws-sdk/client-cognito-identity-provider": "^3.1026.0",
     "@aws-sdk/client-s3": "^3.1025.0",
     "@faker-js/faker": "^10.4.0",

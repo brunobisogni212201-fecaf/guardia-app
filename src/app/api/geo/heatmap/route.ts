@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db/client";
-import { helpRequestsGeo } from "@/lib/db/schema";
+import { db } from "@/shared/lib/db";
+import { helpRequestsGeo } from "@/shared/lib/db/schema";
 import { gte, sql } from "drizzle-orm";
 
 export const revalidate = 300; // cache 5 minutos no Edge
