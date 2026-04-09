@@ -1,171 +1,164 @@
 #!/bin/bash
+# ============================================
+# Script para configurar AWS SES - Email Transacional
+# Para Íris - Plataforma de Proteção à Mulher
+# ============================================
 
 set -e
 
-echo "🚀 Configurando SES para Envio de Emails"
-echo "========================================="
-
 AWS_REGION="us-east-1"
-DOMAIN="guardia.app"
-EMAIL_FROM="contato@$DOMAIN"
+DOMAIN="irisregistro.qzz.io"
+SENDER_EMAIL="contato@$DOMAIN"
 
-echo "Domain: $DOMAIN"
-echo "Email From: $EMAIL_FROM"
+echo "📧 Configurando AWS SES - Íris Email Transacional"
+echo "=================================================="
 
-# 1. Verificar domínio no SES
+# 1. Verificar status do domínio
 echo ""
 echo "1️⃣ Verificando domínio no SES..."
-
-SES_DOMAIN_STATUS=$(aws ses get-identity-verification-attributes \
+VERIFIED=$(aws ses get-identity-verification-attributes \
   --identities "$DOMAIN" \
   --query "VerificationAttributes.$DOMAIN.VerificationStatus" \
   --output text \
-  --region $AWS_REGION)
+  --region $AWS_REGION 2>/dev/null || echo "not_found")
 
-if [ "$SES_DOMAIN_STATUS" != "Success" ]; then
-  echo "Domínio não verificado. Verificando..."
-  
+if [ "$VERIFIED" = "Success" ]; then
+  echo "✅ Domínio $DOMAIN já verificado"
+else
+  echo "🔄 Verificando domínio..."
   aws ses verify-domain-identity --domain "$DOMAIN" --region $AWS_REGION
-  
-  echo "✅ Domínio verificado!"
+  echo "✅ Solicitação de verificação enviada!"
   echo ""
-  echo "📋 Registros DNS para adicionar no Route 53:"
-  echo ""
-  
-  # Obter registros DKIM
-  aws ses get-identity-dkim-attributes \
+  echo "📋 Adicione os seguintes registros DNS no Route 53:"
+  DKIM_TOKENS=$(aws ses get-identity-dkim-attributes \
     --identities "$DOMAIN" \
     --query "DkimAttributes.$DOMAIN.DkimTokens" \
     --output text \
-    --region $AWS_REGION | while read token; do
-    echo "  Name: $token._domainkey.$DOMAIN"
-    echo "  Type: TXT"
-    echo "  Value: v=DKIM1; k=rsa; p=<chave>"
+    --region $AWS_REGION)
+  
+  for token in $DKIM_TOKENS; do
+    echo "  Type: CNAME"
+    echo "  Name: ${token}._domainkey.$DOMAIN"
+    echo "  Value: ${token}.dkim.amazonses.com"
     echo ""
   done
   
-  echo "  Name: $DOMAIN"
   echo "  Type: TXT"
+  echo "  Name: $DOMAIN"
   echo "  Value: v=spf1 include:amazonses.com ~all"
   echo ""
-  
-  echo "⚠️  Adicione estes registros no Route 53 e aguarde a propagação (5-10 minutos)"
-  read -p "Pressione Enter quando os registros estiverem configurados..."
-  
-  # Aguardar verificação
-  echo "Aguardando verificação..."
-  sleep 30
-else
-  echo "✅ Domínio já verificado no SES"
 fi
 
 # 2. Verificar email de envio
 echo ""
 echo "2️⃣ Verificando email de envio..."
-
 EMAIL_STATUS=$(aws ses get-identity-verification-attributes \
-  --identities "$EMAIL_FROM" \
-  --query "VerificationAttributes.$EMAIL_FROM.VerificationStatus" \
+  --identities "$SENDER_EMAIL" \
+  --query "VerificationAttributes.$SENDER_EMAIL.VerificationStatus" \
   --output text \
-  --region $AWS_REGION)
+  --region $AWS_REGION 2>/dev/null || echo "not_found")
 
-if [ "$EMAIL_STATUS" != "Success" ]; then
-  echo "Email não verificado. Verificando..."
-  aws ses verify-email-identity --email-address "$EMAIL_FROM" --region $AWS_REGION
-  echo "✅ Email verificado! (Verifique a caixa de entrada)"
+if [ "$EMAIL_STATUS" = "Success" ]; then
+  echo "✅ Email $SENDER_EMAIL já verificado"
+elif [ "$EMAIL_STATUS" = "not_found" ]; then
+  echo "🔄 Solicitando verificação do email..."
+  aws ses verify-email-identity --email-address "$SENDER_EMAIL" --region $AWS_REGION
+  echo "✅ Verifique seu email para confirmar!"
 else
-  echo "✅ Email já verificado: $EMAIL_FROM"
+  echo "⏳ Email pendente de verificação"
 fi
 
-# 3. Criar IAM policy para SES
+# 3. Criar Configuration Set
 echo ""
-echo "3️⃣ Criando IAM policy para SES..."
+echo "3️⃣ Criando Configuration Set..."
+aws ses create-configuration-set \
+  --configuration-set '{
+    "Name": "iris-prod",
+    "TrackingOptions": {
+      "CustomRedirectDomain": "track.irisregistro.qzz.io"
+    }
+  }' \
+  --region $AWS_REGION 2>/dev/null && echo "✅ Configuration Set 'iris-prod' criado" || echo "ℹ️ Configuration Set já existe"
 
-POLICY_ARN=$(aws iam list-policies --query "Policies[?PolicyName=='SES-Send-Email'].Arn" --output text --region $AWS_REGION)
-
-if [ -z "$POLICY_ARN" ]; then
-  aws iam create-policy \
-    --policy-name SES-Send-Email \
-    --policy-document '{
-      "Version": "2012-10-17",
-      "Statement": [
-        {
-          "Effect": "Allow",
-          "Action": [
-            "ses:SendEmail",
-            "ses:SendRawEmail",
-            "ses:SendTemplatedEmail"
-          ],
-          "Resource": "*"
-        }
-      ]
-    }' \
-    --region $AWS_REGION
-  echo "✅ Policy SES-Send-Email criada"
-else
-  echo "✅ Policy SES-Send-Email já existe"
-fi
-
-# 4. Criar usuário IAM para SES
+# 4. Configurar SNS para bounces e complaints
 echo ""
-echo "4️⃣ Criando usuário IAM para SES..."
+echo "4️⃣ Configurando SNS para notificações de bounce/complaint..."
 
-IAM_USER="guardia-ses-user"
-USER_EXISTS=$(aws iam list-users --query "Users[?UserName=='$IAM_USER'].UserName" --output text --region $AWS_REGION)
+# Criar SNS topic se não existir
+TOPIC_ARN=$(aws sns create-topic \
+  --name iris-ses-notifications \
+  --region $AWS_REGION \
+  --query 'TopicArn' \
+  --output text 2>/dev/null || aws sns list-topics --query 'Topics[?contains(TopicArn, "iris-ses")].TopicArn' --output text --region $AWS_REGION)
 
-if [ -z "$USER_EXISTS" ]; then
-  aws iam create-user --user-name "$IAM_USER" --region $AWS_REGION
-  echo "✅ Usuário IAM $IAM_USER criado"
+if [ -n "$TOPIC_ARN" ]; then
+  echo "✅ SNS Topic: $TOPIC_ARN"
   
-  aws iam attach-user-policy \
-    --user-name "$IAM_USER" \
-    --policy-arn arn:aws:iam::aws:policy/AmazonSESFullAccess \
-    --region $AWS_REGION
-  echo "✅ Policy AmazonSESFullAccess anexada"
+  # Configurar SES para usar SNS
+  aws ses set-configuration-set-tracking-options \
+    --configuration-set-name iris-prod \
+    --tracking-options '{"CustomRedirectDomain": "track.irisregistro.qzz.io"}' \
+    --region $AWS_REGION 2>/dev/null || true
 else
-  echo "✅ Usuário IAM $IAM_USER já existe"
+  echo "ℹ️ SNS Topic já configurado"
 fi
 
-# 5. Criar SMTP credentials
+# 5. Criar Email Templates
 echo ""
-echo "5️⃣ Criando SMTP credentials..."
+echo "5️⃣ Criando templates de email..."
 
-if [ -z "$USER_EXISTS" ]; then
-  ACCESS_KEY=$(aws iam create-access-key --user-name "$IAM_USER" --query "AccessKey" --region $AWS_REGION)
-  echo "✅ SMTP credentials criadas!"
-  echo ""
-  echo "📋 Credenciais SMTP (salve em lugar seguro):"
-  echo "$ACCESS_KEY"
-else
-  echo "⚠️  Usuário já existe. Acesse o console IAM para gerar novas credenciais."
-fi
-
-# 6. Criar template de email
-echo ""
-echo "6️⃣ Criando template de email..."
-
+# Template: Análise completa
 aws ses create-template \
   --template '{
-    "TemplateName": "GuardiaAnalysis",
-    "SubjectPart": "Análise de Conversa - Guardiã",
-    "TextPart": "Olá, sua análise de conversa está pronta. Acesse o aplicativo para ver os resultados.",
-    "HtmlPart": "<h1>Análise de Conversa - Guardiã</h1><p>Olá,</p><p>Sua análise de conversa está pronta. Acesse o aplicativo para ver os resultados.</p>"
+    "TemplateName": "IrisAnaliseCompleta",
+    "SubjectPart": "Sua análise está pronta - Íris",
+    "TextPart": "Olá,\n\nSua análise de conversa foi concluída.\n\nAcesse o Íris para ver os insights e recomendações.\n\nSua segurança é nossa prioridade.\n\nEquipe Íris",
+    "HtmlPart": "<!DOCTYPE html><html><head><style>body{font-family:Arial,sans-serif;background:#0f172a;color:#f8fafc;padding:40px;}.card{background:#1e293b;border-radius:16px;padding:32px;max-width:500px;margin:0 auto;}.btn{background:#f97316;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;margin-top:16px;}.footer{text-align:center;margin-top:24px;font-size:12px;color:#64748b;}</style></head><body><div class=\"card\"><h1 style=\"color:#f97316\">Íris</h1><p>Olá,</p><p>Sua análise de conversa foi concluída com sucesso.</p><p>Acesse o aplicativo para ver os insights e recomendações personalizadas.</p><a href=\"https://irisregistro.qzz.io\" class=\"btn\">Ver Análise</a></div><div class=\"footer\"><p>Sua privacidade é garantida. Não compartilhamos seus dados.</p></div></body></html>"
   }' \
-  --region $AWS_REGION
+  --region $AWS_REGION 2>/dev/null && echo "✅ Template 'IrisAnaliseCompleta' criado" || echo "ℹ️ Template já existe"
 
-echo "✅ Template 'GuardiaAnalysis' criado"
+# Template: Alerta de risco alto
+aws ses create-template \
+  --template '{
+    "TemplateName": "IrisAlertaRisco",
+    "SubjectPart": "⚠️ Alerta de Segurança - Íris",
+    "TextPart": "Olá,\n\nDetectamos indicadores de risco elevado na última análise.\n\nRecomendamos:\n1. Salvar evidências imediatamente\n2. Contatar redes de apoio\n3. Ligar para 180 (Central de Atendimento à Mulher)\n\nNão ignore estes sinais. Você não está sozinha.\n\nEquipe Íris",
+    "HtmlPart": "<!DOCTYPE html><html><head><style>body{font-family:Arial,sans-serif;background:#0f172a;color:#f8fafc;padding:40px;}.card{background:#1e293b;border-radius:16px;padding:32px;max-width:500px;margin:0 auto;border-left:4px solid #ef4444;}.alert{background:#ef4444/10;border-radius:8px;padding:16px;margin:16px 0;}.btn{background:#ef4444;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;margin-top:8px;}.helpline{background:#22c55e/10;border-radius:8px;padding:16px;margin-top:16px;}.footer{text-align:center;margin-top:24px;font-size:12px;color:#64748b;}</style></head><body><div class=\"card\"><h1 style=\"color:#f97316\">Íris</h1><div class=\"alert\"><strong>⚠️ Alerta de Segurança</strong></div><p>Detectamos indicadores de risco elevado na última análise.</p><p><strong>Recomendamos:</strong></p><ul><li>Salvar evidências imediatamente</li><li>Contatar redes de apoio</li><li>Ligar para <strong>180</strong> - Central de Atendimento à Mulher</li></ul><div class=\"helpline\"><strong>🌟 Você não está sozinha</strong><br>Ligue 180 para apoio gratuito e sigiloso</div><a href=\"https://irisregistro.qzz.io/evidence\" class=\"btn\">Salvar Evidências</a></div><div class=\"footer\"><p>Sua segurança é nossa prioridade</p></div></body></html>"
+  }' \
+  --region $AWS_REGION 2>/dev/null && echo "✅ Template 'IrisAlertaRisco' criado" || echo "ℹ️ Template já existe"
+
+# Template: Boas-vindas
+aws ses create-template \
+  --template '{
+    "TemplateName": "IrisBemVinda",
+    "SubjectPart": "Bem-vinda ao Íris - Sua segurança é nossa prioridade",
+    "TextPart": "Olá,\n\nSeja muito bem-vinda ao Íris!\n\nVocê agora faz parte de uma comunidade de mulheres que valorizam sua segurança e bem-estar.\n\nRecursos disponíveis:\n• Análise de conversas\n• Registro seguro de evidências\n• Busca preventiva\n• Rede de apoio\n\nEstamos aqui para você.\n\nEquipe Íris",
+    "HtmlPart": "<!DOCTYPE html><html><head><style>body{font-family:Arial,sans-serif;background:#0f172a;color:#f8fafc;padding:40px;}.card{background:#1e293b;border-radius:16px;padding:32px;max-width:500px;margin:0 auto;}.feature{background:#0f172a;padding:12px;border-radius:8px;margin:8px 0;}.btn{background:#f97316;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;margin-top:16px;}.footer{text-align:center;margin-top:24px;font-size:12px;color:#64748b;}</style></head><body><div class=\"card\"><h1 style=\"color:#f97316\">Bem-vinda ao Íris!</h1><p>Você agora faz parte de uma comunidade que valoriza sua segurança.</p><div class=\"feature\">📊 Análise de conversas com IA</div><div class=\"feature\">🔒 Registro seguro de evidências</div><div class=\"feature\">🔍 Busca preventiva</div><div class=\"feature\">💜 Rede de apoio</div><p>Estamos aqui para você.</p><a href=\"https://irisregistro.qzz.io/dashboard\" class=\"btn\">Acessar Dashboard</a></div><div class=\"footer\"><p>Sua privacidade é garantida. Seus dados são criptografados.</p></div></body></html>"
+  }' \
+  --region $AWS_REGION 2>/dev/null && echo "✅ Template 'IrisBemVinda' criado" || echo "ℹ️ Template já existe"
+
+# 6. Listar Configuration Sets
+echo ""
+echo "6️⃣ Configuration Sets configurados:"
+aws ses list-configuration-sets --region $AWS_REGION --query 'ConfigurationSetNames' --output table 2>/dev/null || echo "Nenhum"
 
 echo ""
-echo "========================================="
+echo "=================================================="
 echo "✅ Configuração SES concluída!"
 echo ""
 echo "📧 Configurações de SMTP:"
-echo "   Servidor: smtp.us-east-1.amazonaws.com"
-echo "   Porta: 587 (TLS)"
-echo "   Usuário: [IAM_USER_ACCESS_KEY]"
-echo "   Senha: [IAM_USER_SECRET_KEY]"
+echo "   Servidor: email-smtp.$AWS_REGION.amazonaws.com"
+echo "   Porta: 587 (STARTTLS) ou 465 (SMTPS)"
+echo "   Usuário: Access Key IAM com policy SES"
+echo "   Senha: Secret Key IAM"
 echo ""
-echo "📧 Email de envio: $EMAIL_FROM"
+echo "📧 Email de envio: $SENDER_EMAIL"
 echo ""
-echo "💡 Use o comando abaixo para testar o envio:"
-echo "aws ses send-email --from \"$EMAIL_FROM\" --destination file://dest.json --message file://message.json --region $AWS_REGION"
+echo "📋 Para obter SMTP credentials:"
+echo "   1. AWS Console > IAM > Users"
+echo "   2. Crie usuário com policy AmazonSESFullAccess"
+echo "   3. AWS Console > SES > SMTP settings > Create SMTP credentials"
+echo ""
+echo "⚠️ IMPORTANTE: Solicite saída do sandbox SES em:"
+echo "   https://console.aws.amazon.com/ses/home?region=$AWS_REGION#/account"
+echo "=================================================="

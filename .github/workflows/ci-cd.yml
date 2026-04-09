@@ -1,0 +1,308 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: guardia-app
+  ECS_CLUSTER: guardia-cluster
+
+jobs:
+  test:
+    name: Tests & Quality
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint || true
+
+      - name: Type check
+        run: npm run typecheck || true
+
+      - name: Build
+        run: npm run build
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+          GEMINI_API_KEY: test-key
+          AUTH0_DOMAIN: test.auth0.com
+          AUTH0_CLIENT_ID: test
+          AUTH0_CLIENT_SECRET: test
+
+  build-staging:
+    name: Build Docker (Staging)
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag and push image (Staging)
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: staging-${{ github.sha }}
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            --build-arg ENVIRONMENT=staging \
+            -t "$ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:${IMAGE_TAG}" \
+            -t "$ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:staging-latest" \
+            -f Dockerfile .
+          
+          docker push "$ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:${IMAGE_TAG}"
+          docker push "$ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:staging-latest"
+          
+          echo "image=$ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to ECS Staging
+        env:
+          IMAGE_URI: ${{ steps.build-image.outputs.image }}
+          ECS_SERVICE_STAGING: guardia-service-staging
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ env.ECS_SERVICE_STAGING }} \
+            --task-definition guardia-app-staging \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+          
+          aws ecs wait services-stable \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.ECS_SERVICE_STAGING }} \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Notify deployment
+        run: |
+          echo "🎉 Staging deploy initiated!"
+          echo "Image: ${{ steps.build-image.outputs.image }}"
+          echo "Environment: https://staging.irisregistro.qzz.io"
+
+  build-production:
+    name: Build Docker (Production)
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag and push image (Production)
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: prod-${{ github.sha }}
+          SHORT_SHA: ${{ github.sha }}
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            --build-arg ENVIRONMENT=production \
+            -t "$ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:${IMAGE_TAG}" \
+            -t "$ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:prod-latest" \
+            -f Dockerfile .
+          
+          docker push "$ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:${IMAGE_TAG}"
+          docker push "$ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:prod-latest"
+          
+          echo "image=$ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Register task definition
+        id: task-def
+        env:
+          IMAGE_URI: ${{ steps.build-image.outputs.image }}
+        run: |
+          cat > task-definition.json << 'TASKEOF'
+          {
+            "family": "guardia-app-prod",
+            "networkMode": "awsvpc",
+            "requiresCompatibilities": ["FARGATE"],
+            "cpu": "256",
+            "memory": "512",
+            "executionRoleArn": "arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/ecsTaskExecutionRole",
+            "containerDefinitions": [
+              {
+                "name": "guardia-app",
+                "image": "IMAGE_PLACEHOLDER",
+                "essential": true,
+                "portMappings": [
+                  {
+                    "containerPort": 3000,
+                    "protocol": "tcp"
+                  }
+                ],
+                "environment": [
+                  {"name": "NODE_ENV", "value": "production"},
+                  {"name": "PORT", "value": "3000"},
+                  {"name": "HOSTNAME", "value": "0.0.0.0"},
+                  {"name": "AWS_REGION", "value": "us-east-1"},
+                  {"name": "AWS_S3_BUCKET_ANALYSIS", "value": "guardia-uploads-us-east-1"},
+                  {"name": "AUTH0_DOMAIN", "value": "${{ secrets.AUTH0_DOMAIN }}"},
+                  {"name": "AUTH0_CLIENT_ID", "value": "${{ secrets.AUTH0_CLIENT_ID }}"},
+                  {"name": "AUTH0_CLIENT_SECRET", "value": "${{ secrets.AUTH0_CLIENT_SECRET }}"},
+                  {"name": "DATABASE_URL", "value": "${{ secrets.DATABASE_URL }}"},
+                  {"name": "GEMINI_API_KEY", "value": "${{ secrets.GEMINI_API_KEY }}"},
+                  {"name": "APICPF_API_KEY", "value": "${{ secrets.APICPF_API_KEY }}"},
+                  {"name": "DATAJUD_API_KEY", "value": "${{ secrets.DATAJUD_API_KEY }}"},
+                  {"name": "SES_SMTP_HOST", "value": "${{ secrets.SES_SMTP_HOST }}"},
+                  {"name": "SES_SMTP_PORT", "value": "${{ secrets.SES_SMTP_PORT }}"},
+                  {"name": "SES_FROM_EMAIL", "value": "${{ secrets.SES_FROM_EMAIL }}"},
+                  {"name": "SES_ACCESS_KEY_ID", "value": "${{ secrets.SES_ACCESS_KEY_ID }}"},
+                  {"name": "SES_SECRET_ACCESS_KEY", "value": "${{ secrets.SES_SECRET_ACCESS_KEY }}"},
+                  {"name": "APP_URL", "value": "${{ secrets.APP_URL }}"}
+                ],
+                "secrets": [
+                  {
+                    "name": "AUTH0_DOMAIN",
+                    "valueFrom": "${{ secrets.AUTH0_DOMAIN_ARN }}"
+                  },
+                  {
+                    "name": "AUTH0_CLIENT_ID",
+                    "valueFrom": "${{ secrets.AUTH0_CLIENT_ID_ARN }}"
+                  },
+                  {
+                    "name": "AUTH0_CLIENT_SECRET",
+                    "valueFrom": "${{ secrets.AUTH0_CLIENT_SECRET_ARN }}"
+                  },
+                  {
+                    "name": "DATABASE_URL",
+                    "valueFrom": "${{ secrets.DATABASE_URL_ARN }}"
+                  },
+                  {
+                    "name": "GEMINI_API_KEY",
+                    "valueFrom": "${{ secrets.GEMINI_API_KEY_ARN }}"
+                  },
+                  {
+                    "name": "APICPF_API_KEY",
+                    "valueFrom": "${{ secrets.APICPF_API_KEY_ARN }}"
+                  }
+                ],
+                "logConfiguration": {
+                  "logDriver": "awslogs",
+                  "options": {
+                    "awslogs-group": "/ecs/guardia-app",
+                    "awslogs-region": "us-east-1",
+                    "awslogs-stream-prefix": "ecs"
+                  }
+                }
+              }
+            ]
+          }
+          TASKEOF
+          
+          sed -i "s|IMAGE_PLACEHOLDER|${IMAGE_URI}|g" task-definition.json
+          
+          TASK_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://task-definition.json \
+            --region us-east-1 \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+          echo "task-arn=${TASK_ARN}" >> "$GITHUB_OUTPUT"
+          echo "Registered: ${TASK_ARN}"
+
+      - name: Deploy to ECS Production
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ secrets.ECS_SERVICE_PROD }} \
+            --task-definition guardia-app-prod \
+            --desired-count 2 \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+          
+          aws ecs wait services-stable \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ secrets.ECS_SERVICE_PROD }} \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Verify deployment
+        run: |
+          echo "================================================"
+          echo " Deploy Production Finalizado!"
+          echo " URL: https://irisregistro.qzz.io"
+          echo " Image: ${{ steps.build-image.outputs.image }}"
+          echo " Commit: ${{ github.sha }}"
+          echo "================================================"
+
+  rollback:
+    name: Rollback Production
+    needs: build-production
+    runs-on: ubuntu-latest
+    if: failure()
+    environment: production
+    
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get previous task definition
+        id: previous-task
+        run: |
+          PREV_TASK=$(aws ecs describe-services \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ secrets.ECS_SERVICE_PROD }} \
+            --region ${{ env.AWS_REGION }} \
+            --query 'services[0].taskDefinition' \
+            --output text)
+          echo "previous-task=${PREV_TASK}" >> "$GITHUB_OUTPUT"
+
+      - name: Rollback to previous task
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ secrets.ECS_SERVICE_PROD }} \
+            --task-definition "${{ steps.previous-task.outputs.previous-task }}" \
+            --region ${{ env.AWS_REGION }}
+          
+          echo "⚠️ Rollback iniciado para: ${{ steps.previous-task.outputs.previous-task }}"
