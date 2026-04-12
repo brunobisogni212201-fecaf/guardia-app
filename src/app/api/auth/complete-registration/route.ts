@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, users, sessions } from "@/shared/lib/db";
 import { hashData, generateToken } from "@/shared/lib/utils/hash";
 import { eq, and, gt } from "drizzle-orm";
-import nodemailer from "nodemailer";
+import { sendWelcomeEmail } from "@/shared/lib/email";
 
 const APICPF_API_KEY = process.env.APICPF_API_KEY;
 
@@ -78,72 +78,6 @@ async function getAddressByCEP(cep: string): Promise<{ lat?: number; lng?: numbe
   }
 
   return {};
-}
-
-async function sendWelcomeEmail(email: string, name: string) {
-  const transporter = nodemailer.createTransport({
-    host: process.env.SES_SMTP_HOST || "smtp.us-east-1.amazonaws.com",
-    port: parseInt(process.env.SES_SMTP_PORT || "587"),
-    secure: false,
-    auth: {
-      user: process.env.SES_ACCESS_KEY_ID,
-      pass: process.env.SES_SECRET_ACCESS_KEY,
-    },
-  });
-
-  const htmlContent = `
-<!DOCTYPE html>
-<html>
-<head>
-  <style>
-    body { font-family: Arial, sans-serif; background: #0f172a; color: #f8fafc; padding: 40px; }
-    .card { background: #1e293b; border-radius: 16px; padding: 32px; max-width: 500px; margin: 0 auto; }
-    .logo { color: #f97316; font-size: 24px; font-weight: bold; }
-    .btn { background: #f97316; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none; display: inline-block; margin-top: 16px; }
-    .feature { background: #0f172a; padding: 12px; border-radius: 8px; margin: 8px 0; }
-    .footer { text-align: center; margin-top: 24px; font-size: 12px; color: #64748b; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div class="logo">ÍRIS</div>
-    <h1 style="color: #f97316; margin-top: 20px;">Bem-vinda ao Íris!</h1>
-    
-    <p>Olá, ${name || "querida"}!</p>
-    
-    <p>Você agora faz parte de uma comunidade que valoriza sua segurança e bem-estar.</p>
-    
-    <div class="feature">📊 Análise de conversas com IA</div>
-    <div class="feature">🔒 Registro seguro de evidências</div>
-    <div class="feature">🔍 Busca preventiva</div>
-    <div class="feature">💜 Rede de apoio</div>
-    
-    <p>Estamos aqui para você.</p>
-    
-    <a href="https://irisregistro.qzz.io/dashboard" class="btn">Acessar Dashboard</a>
-  </div>
-  
-  <div class="footer">
-    <p>Sua privacidade é garantida. Seus dados são criptografados.</p>
-    <p>Íris - Sua segurança é nossa prioridade</p>
-  </div>
-</body>
-</html>
-  `;
-
-  try {
-    await transporter.sendMail({
-      from: process.env.SES_FROM_EMAIL || "contato@irisregistro.qzz.io",
-      to: email,
-      subject: "Bem-vinda ao Íris - Sua segurança é nossa prioridade",
-      html: htmlContent,
-    });
-    console.log(`Welcome email sent to ${email}`);
-    return true;
-  } catch (error) {
-    console.error("Failed to send welcome email:", error);
-    return false;
-  }
 }
 
 export async function POST(request: NextRequest) {
