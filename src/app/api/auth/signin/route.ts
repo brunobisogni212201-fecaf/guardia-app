@@ -6,61 +6,16 @@ import { eq } from "drizzle-orm";
 const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN || "guardial-app.us.auth0.com";
 const AUTH0_CLIENT_ID = process.env.AUTH0_CLIENT_ID;
 const AUTH0_CLIENT_SECRET = process.env.AUTH0_CLIENT_SECRET;
-const AUTH0_AUDIENCE = `https://${AUTH0_DOMAIN}/api/v2/`;
-
-async function getAccessToken(): Promise<string> {
-  const response = await fetch(`https://${AUTH0_DOMAIN}/oauth/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      client_id: AUTH0_CLIENT_ID,
-      client_secret: AUTH0_CLIENT_SECRET,
-      audience: AUTH0_AUDIENCE,
-      grant_type: "client_credentials",
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to get Access Token");
-  }
-
-  const data = await response.json();
-  return data.access_token;
-}
 
 export async function POST(request: Request) {
   try {
-    const { email, password, action = "login" } = await request.json();
+    const { email, password } = await request.json();
 
     if (!email || !password) {
       return NextResponse.json(
         { error: "Email e senha são obrigatórios" },
         { status: 400 }
       );
-    }
-
-    const accessToken = await getAccessToken();
-
-    if (action === "register") {
-      const signupResponse = await fetch(`https://${AUTH0_DOMAIN}/dbconnections/signup`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          client_id: AUTH0_CLIENT_ID,
-          email,
-          password,
-          connection: "Username-Password-Authentication",
-        }),
-      });
-
-      const signupData = await signupResponse.json();
-
-      if (!signupResponse.ok) {
-        return NextResponse.json(
-          { error: signupData.description || "Erro ao criar conta" },
-          { status: 400 }
-        );
-      }
     }
 
     const loginResponse = await fetch(`https://${AUTH0_DOMAIN}/oauth/token`, {
@@ -80,6 +35,7 @@ export async function POST(request: Request) {
     const loginData = await loginResponse.json();
 
     if (!loginResponse.ok) {
+      console.error("Auth0 login failed:", JSON.stringify(loginData));
       return NextResponse.json(
         { error: loginData.error_description || "Email ou senha incorretos" },
         { status: 401 }
@@ -90,7 +46,16 @@ export async function POST(request: Request) {
       headers: { Authorization: `Bearer ${loginData.access_token}` },
     });
 
+    if (!userInfoResponse.ok) {
+      console.error("Auth0 userinfo failed:", userInfoResponse.status);
+      return NextResponse.json(
+        { error: "Erro ao buscar informações do usuário" },
+        { status: 500 }
+      );
+    }
+
     const userInfo = await userInfoResponse.json();
+    console.log("Auth0 userinfo success:", userInfo.sub);
 
     const emailHash = hashData(email);
     let user = await db.query.users.findFirst({
